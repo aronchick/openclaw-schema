@@ -1,0 +1,670 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://raw.githubusercontent.com/aronchick/openclaw-schema/main/openclaw.schema.json",
+  "title": "OpenClaw Configuration",
+  "description": "Schema for ~/.openclaw/openclaw.json — the OpenClaw gateway and agent configuration file. See https://docs.openclaw.ai for full documentation.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "JSON Schema reference. Point to the SchemaStore URL or the raw GitHub URL for this schema."
+    },
+    "meta": {
+      "type": "object",
+      "description": "Internal metadata written by OpenClaw. Do not edit manually.",
+      "additionalProperties": true,
+      "properties": {
+        "lastTouchedVersion": {
+          "type": "string",
+          "description": "The OpenClaw version that last modified this config."
+        },
+        "lastTouchedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO 8601 timestamp when the config was last modified."
+        }
+      }
+    },
+    "env": {
+      "type": "object",
+      "description": "Environment variables injected into agent sessions.",
+      "properties": {
+        "vars": {
+          "type": "object",
+          "description": "Key-value pairs of environment variables. Use for API keys and other secrets.",
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "wizard": {
+      "type": "object",
+      "description": "Setup wizard state. Managed by openclaw configure — do not edit manually.",
+      "additionalProperties": true
+    },
+    "logging": {
+      "type": "object",
+      "description": "Logging configuration for the gateway.",
+      "additionalProperties": false,
+      "properties": {
+        "level": {
+          "type": "string",
+          "description": "Log verbosity level for file logs.",
+          "enum": ["error", "warn", "info", "debug", "trace"]
+        },
+        "consoleLevel": {
+          "type": "string",
+          "description": "Log verbosity level for console output.",
+          "enum": ["error", "warn", "info", "debug", "trace"]
+        },
+        "file": {
+          "type": "string",
+          "description": "Absolute path to the log file."
+        }
+      }
+    },
+    "auth": {
+      "type": "object",
+      "description": "Authentication profiles for AI model providers.",
+      "properties": {
+        "profiles": {
+          "type": "object",
+          "description": "Named auth profiles, keyed by 'provider:name' (e.g. 'anthropic:default').",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "provider": {
+                "type": "string",
+                "description": "The AI provider name.",
+                "examples": ["anthropic", "openai", "openrouter", "google"]
+              },
+              "mode": {
+                "type": "string",
+                "description": "Authentication mode.",
+                "enum": ["token", "oauth", "bedrock"]
+              }
+            },
+            "required": ["provider", "mode"],
+            "additionalProperties": true
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "models": {
+      "type": "object",
+      "description": "Model provider configuration including custom providers and Bedrock discovery.",
+      "additionalProperties": true,
+      "properties": {
+        "providers": {
+          "type": "object",
+          "description": "Custom model provider definitions, keyed by provider alias.",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "baseUrl": {
+                "type": "string",
+                "description": "Base URL for the provider API.",
+                "format": "uri"
+              },
+              "auth": {
+                "type": "string",
+                "enum": ["token", "bearer", "none"],
+                "description": "Authentication type for the provider."
+              },
+              "api": {
+                "type": "string",
+                "description": "API format to use for this provider.",
+                "examples": ["anthropic-messages", "openai-chat", "openai-responses"]
+              },
+              "headers": {
+                "type": "object",
+                "description": "Additional HTTP headers to send with every request.",
+                "additionalProperties": { "type": "string" }
+              },
+              "models": {
+                "type": "array",
+                "description": "List of model definitions available on this provider.",
+                "items": {
+                  "type": "object",
+                  "required": ["id"],
+                  "properties": {
+                    "id": { "type": "string", "description": "Model identifier as used by the provider API." },
+                    "name": { "type": "string", "description": "Human-readable display name." },
+                    "reasoning": { "type": "boolean", "description": "Whether this model supports extended thinking/reasoning." },
+                    "input": {
+                      "type": "array",
+                      "items": { "type": "string", "enum": ["text", "image", "audio", "video", "file"] },
+                      "description": "Supported input modalities."
+                    },
+                    "contextWindow": { "type": "integer", "description": "Context window size in tokens." },
+                    "maxTokens": { "type": "integer", "description": "Maximum output tokens." },
+                    "cost": {
+                      "type": "object",
+                      "description": "Pricing in USD per million tokens.",
+                      "properties": {
+                        "input": { "type": "number" },
+                        "output": { "type": "number" },
+                        "cacheRead": { "type": "number" },
+                        "cacheWrite": { "type": "number" }
+                      }
+                    }
+                  },
+                  "additionalProperties": true
+                }
+              }
+            },
+            "additionalProperties": true
+          }
+        },
+        "bedrockDiscovery": {
+          "type": "object",
+          "description": "AWS Bedrock model auto-discovery settings.",
+          "properties": {
+            "enabled": { "type": "boolean", "description": "Enable automatic discovery of Bedrock models." }
+          },
+          "additionalProperties": false
+        }
+      }
+    },
+    "agents": {
+      "type": "object",
+      "description": "Agent configuration: defaults applied to all agents and the list of named agents.",
+      "additionalProperties": false,
+      "properties": {
+        "defaults": {
+          "type": "object",
+          "description": "Default settings inherited by all agents unless overridden.",
+          "additionalProperties": true,
+          "properties": {
+            "model": {
+              "type": "object",
+              "description": "Default model routing configuration.",
+              "properties": {
+                "primary": {
+                  "type": "string",
+                  "description": "Primary model in 'provider/model-id' format.",
+                  "examples": ["anthropic/claude-sonnet-4-6", "google/gemini-3-flash-preview"]
+                },
+                "fallbacks": {
+                  "type": "array",
+                  "description": "Ordered list of fallback models if the primary fails.",
+                  "items": { "type": "string" }
+                }
+              },
+              "additionalProperties": false
+            },
+            "models": {
+              "type": "object",
+              "description": "Short aliases for model identifiers. Keys are 'provider/model-id', values have an 'alias' field.",
+              "additionalProperties": {
+                "type": "object",
+                "properties": {
+                  "alias": { "type": "string", "description": "Short alias (e.g. 'opus', 'flash', 'sonnet')." }
+                },
+                "required": ["alias"],
+                "additionalProperties": false
+              }
+            },
+            "workspace": {
+              "type": "string",
+              "description": "Absolute path to the agent workspace directory."
+            },
+            "contextTokens": {
+              "type": "integer",
+              "description": "Maximum context window size in tokens for agent sessions."
+            },
+            "compaction": {
+              "type": "object",
+              "description": "Session compaction settings.",
+              "properties": {
+                "mode": {
+                  "type": "string",
+                  "enum": ["safeguard", "aggressive", "off"],
+                  "description": "Compaction strategy."
+                }
+              },
+              "additionalProperties": false
+            },
+            "elevatedDefault": {
+              "type": "string",
+              "enum": ["on", "off", "ask"],
+              "description": "Whether elevated exec permissions are on by default."
+            },
+            "heartbeat": {
+              "type": "object",
+              "description": "Heartbeat poll configuration.",
+              "properties": {
+                "every": { "type": "string", "description": "Interval (e.g. '30m', '1h').", "examples": ["30m", "1h", "2h"] },
+                "model": { "type": "string", "description": "Model to use for heartbeat responses." },
+                "target": { "type": "string", "description": "Delivery target channel for heartbeat replies." }
+              },
+              "additionalProperties": false
+            },
+            "maxConcurrent": {
+              "type": "integer",
+              "description": "Maximum number of concurrent agent sessions."
+            },
+            "subagents": {
+              "type": "object",
+              "description": "Sub-agent defaults.",
+              "properties": {
+                "maxConcurrent": { "type": "integer" },
+                "model": { "type": "string" }
+              },
+              "additionalProperties": false
+            }
+          }
+        },
+        "list": {
+          "type": "array",
+          "description": "Named agent definitions. Each agent can override defaults.",
+          "items": {
+            "type": "object",
+            "required": ["id"],
+            "properties": {
+              "id": { "type": "string", "description": "Unique agent identifier." },
+              "name": { "type": "string", "description": "Display name for the agent." },
+              "default": { "type": "boolean", "description": "If true, this agent handles messages not targeted to a specific agent." },
+              "model": { "type": "string", "description": "Override the default model for this agent." },
+              "workspace": { "type": "string", "description": "Override the workspace path for this agent." }
+            },
+            "additionalProperties": true
+          }
+        }
+      }
+    },
+    "tools": {
+      "type": "object",
+      "description": "Tool configuration: web search, agent-to-agent comms, elevated exec.",
+      "additionalProperties": true,
+      "properties": {
+        "web": {
+          "type": "object",
+          "properties": {
+            "search": {
+              "type": "object",
+              "properties": {
+                "apiKey": { "type": "string", "description": "Brave Search API key." }
+              },
+              "additionalProperties": true
+            }
+          }
+        },
+        "agentToAgent": {
+          "type": "object",
+          "description": "Agent-to-agent messaging settings.",
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "allow": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "Allowlist of agent IDs. Use ['*'] to allow all."
+            }
+          },
+          "additionalProperties": false
+        },
+        "elevated": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean", "description": "Allow agents to run elevated (host-level) commands." }
+          },
+          "additionalProperties": false
+        },
+        "exec": {
+          "type": "object",
+          "description": "Exec tool settings.",
+          "properties": {
+            "host": { "type": "string", "enum": ["sandbox", "host"], "description": "Where exec commands run by default." }
+          },
+          "additionalProperties": true
+        }
+      }
+    },
+    "messages": {
+      "type": "object",
+      "description": "Messaging behavior settings.",
+      "additionalProperties": false,
+      "properties": {
+        "ackReactionScope": {
+          "type": "string",
+          "enum": ["none", "dm", "group", "group-mentions", "all"],
+          "description": "When to add an acknowledgement reaction to incoming messages."
+        }
+      }
+    },
+    "commands": {
+      "type": "object",
+      "description": "Slash command settings.",
+      "additionalProperties": false,
+      "properties": {
+        "native": {
+          "oneOf": [
+            { "type": "boolean" },
+            { "type": "string", "enum": ["auto"] }
+          ],
+          "description": "Whether to register native platform slash commands (e.g. Discord application commands). Use 'auto' to let OpenClaw decide. Set false if you encounter message queue issues (bug #4555)."
+        },
+        "nativeSkills": {
+          "oneOf": [
+            { "type": "boolean" },
+            { "type": "string", "enum": ["auto"] }
+          ],
+          "description": "Whether to register skill commands as native slash commands."
+        },
+        "restart": {
+          "type": "boolean",
+          "description": "Allow /restart command to restart the gateway."
+        }
+      }
+    },
+    "session": {
+      "type": "object",
+      "description": "Session storage and maintenance settings.",
+      "additionalProperties": false,
+      "properties": {
+        "maintenance": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "mode": {
+              "type": "string",
+              "enum": ["enforce", "warn", "off"],
+              "description": "How strictly to enforce session retention limits."
+            },
+            "pruneAfter": {
+              "type": "string",
+              "description": "Age after which inactive sessions are pruned (e.g. '7d', '30d').",
+              "examples": ["7d", "14d", "30d"]
+            },
+            "maxEntries": {
+              "type": "integer",
+              "description": "Maximum number of stored session entries."
+            },
+            "rotateBytes": {
+              "type": "string",
+              "description": "Rotate log files when they exceed this size (e.g. '10mb').",
+              "examples": ["5mb", "10mb", "50mb"]
+            }
+          }
+        }
+      }
+    },
+    "cron": {
+      "type": "object",
+      "description": "Cron job scheduler settings.",
+      "additionalProperties": true,
+      "properties": {
+        "sessionRetention": {
+          "type": "string",
+          "description": "How long to retain cron session history (e.g. '6h', '24h').",
+          "examples": ["6h", "12h", "24h"]
+        },
+        "jobs": {
+          "type": "array",
+          "description": "List of scheduled cron jobs.",
+          "items": {
+            "type": "object",
+            "required": ["name", "schedule"],
+            "properties": {
+              "name": { "type": "string", "description": "Unique job name." },
+              "schedule": { "type": "string", "description": "Cron expression (e.g. '0 9 * * *') or interval (e.g. 'every 30m')." },
+              "enabled": { "type": "boolean", "description": "Whether this job is active." },
+              "delivery": {
+                "type": "object",
+                "description": "Where to send the output.",
+                "properties": {
+                  "to": {
+                    "type": "string",
+                    "description": "Delivery target. Must use 'channel:<id>' or 'user:<id>' prefix for Discord. Examples: 'channel:1234567890', 'user:9876543210'."
+                  }
+                },
+                "additionalProperties": true
+              }
+            },
+            "additionalProperties": true
+          }
+        }
+      }
+    },
+    "hooks": {
+      "type": "object",
+      "description": "Internal agent hook server settings.",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "path": { "type": "string", "description": "URL path prefix for the hook server." },
+        "token": { "type": "string", "description": "Shared secret token for hook authentication." },
+        "allowRequestSessionKey": { "type": "boolean" },
+        "allowedSessionKeyPrefixes": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Session key prefixes that hooks may target."
+        },
+        "allowedAgentIds": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Agent IDs allowed to receive hooks. Use ['*'] for all."
+        }
+      }
+    },
+    "channels": {
+      "type": "object",
+      "description": "Channel plugin configuration. Each key is a channel type.",
+      "additionalProperties": true,
+      "properties": {
+        "telegram": {
+          "type": "object",
+          "description": "Telegram bot channel configuration.",
+          "additionalProperties": true,
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "botToken": { "type": "string", "description": "Telegram bot token from @BotFather." },
+            "dmPolicy": {
+              "type": "string",
+              "enum": ["open", "allowlist", "closed"],
+              "description": "Who can DM the bot."
+            },
+            "allowFrom": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "Allowlist of user IDs or chat IDs. Use ['*'] for everyone."
+            },
+            "groupPolicy": {
+              "type": "string",
+              "enum": ["allowlist", "open", "closed"],
+              "description": "Policy for group/channel messages."
+            },
+            "streamMode": {
+              "type": "string",
+              "enum": ["block", "stream"],
+              "description": "How to deliver streaming responses."
+            }
+          }
+        },
+        "discord": {
+          "type": "object",
+          "description": "Discord bot channel configuration.",
+          "additionalProperties": true,
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "token": { "type": "string", "description": "Discord bot token." },
+            "groupPolicy": {
+              "type": "string",
+              "enum": ["allowlist", "open", "closed"]
+            },
+            "historyLimit": {
+              "type": "integer",
+              "description": "Number of recent messages to include as context."
+            },
+            "commands": {
+              "type": "object",
+              "properties": {
+                "native": {
+                  "type": "boolean",
+                  "description": "Register Discord slash commands. Set false to fix message queue issues (bug #4555)."
+                }
+              },
+              "additionalProperties": false
+            },
+            "intents": {
+              "type": "object",
+              "description": "Discord gateway intents. Require enabling in the Discord Developer Portal.",
+              "properties": {
+                "presence": { "type": "boolean", "description": "Presence intent (requires portal toggle)." },
+                "guildMembers": { "type": "boolean", "description": "Guild Members intent (requires portal toggle)." }
+              },
+              "additionalProperties": false
+            },
+            "guilds": {
+              "type": "object",
+              "description": "Per-guild configuration, keyed by guild ID.",
+              "additionalProperties": {
+                "type": "object",
+                "properties": {
+                  "requireMention": { "type": "boolean" },
+                  "channels": {
+                    "type": "object",
+                    "description": "Per-channel overrides, keyed by channel ID.",
+                    "additionalProperties": {
+                      "type": "object",
+                      "properties": {
+                        "systemPrompt": { "type": "string", "description": "Additional system prompt injected for messages in this channel." }
+                      },
+                      "additionalProperties": true
+                    }
+                  }
+                },
+                "additionalProperties": true
+              }
+            }
+          }
+        }
+      }
+    },
+    "gateway": {
+      "type": "object",
+      "description": "Gateway server configuration.",
+      "additionalProperties": false,
+      "properties": {
+        "port": {
+          "type": "integer",
+          "description": "WebSocket port the gateway listens on.",
+          "default": 18789,
+          "minimum": 1024,
+          "maximum": 65535
+        },
+        "mode": {
+          "type": "string",
+          "enum": ["local", "remote"],
+          "description": "Gateway mode. Use 'local' for self-hosted setups."
+        },
+        "bind": {
+          "type": "string",
+          "enum": ["loopback", "lan", "tailnet", "auto", "custom"],
+          "description": "Network binding mode. 'loopback' restricts to localhost only."
+        },
+        "controlUi": {
+          "type": "object",
+          "description": "Web-based control UI settings.",
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "dangerouslyDisableDeviceAuth": {
+              "type": "boolean",
+              "description": "Disable device authentication for the control UI. WARNING: Only use on fully trusted networks."
+            }
+          },
+          "additionalProperties": false
+        },
+        "auth": {
+          "type": "object",
+          "description": "Gateway authentication settings.",
+          "additionalProperties": false,
+          "properties": {
+            "mode": {
+              "type": "string",
+              "enum": ["token", "password", "none"],
+              "description": "Auth mode for the gateway API. 'none' should only be used on loopback interfaces — triggers a security finding."
+            },
+            "token": {
+              "type": "string",
+              "description": "Shared token for gateway authentication (mode=token)."
+            },
+            "allowTailscale": {
+              "type": "boolean",
+              "description": "Allow connections from the Tailscale network without additional auth."
+            }
+          }
+        },
+        "trustedProxies": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "CIDR ranges of trusted reverse proxy addresses."
+        },
+        "tailscale": {
+          "type": "object",
+          "properties": {
+            "mode": { "type": "string", "enum": ["serve", "off"], "description": "Tailscale serve integration mode." },
+            "resetOnExit": { "type": "boolean" }
+          },
+          "additionalProperties": false
+        }
+      }
+    },
+    "skills": {
+      "type": "object",
+      "description": "Skill manager settings and per-skill configuration.",
+      "additionalProperties": false,
+      "properties": {
+        "install": {
+          "type": "object",
+          "properties": {
+            "nodeManager": { "type": "string", "enum": ["npm", "pnpm", "yarn", "bun"], "description": "Node package manager to use when installing skill packages." }
+          },
+          "additionalProperties": false
+        },
+        "entries": {
+          "type": "object",
+          "description": "Per-skill configuration, keyed by skill name. Schema is skill-defined.",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        }
+      }
+    },
+    "plugins": {
+      "type": "object",
+      "description": "Plugin enable/disable flags. Plugin config keys match the plugin name.",
+      "additionalProperties": true,
+      "properties": {
+        "entries": {
+          "type": "object",
+          "description": "Per-plugin configuration.",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "enabled": { "type": "boolean" }
+            },
+            "additionalProperties": true
+          }
+        }
+      }
+    },
+    "memory": {
+      "type": "object",
+      "description": "Memory backend configuration (search providers, embeddings).",
+      "additionalProperties": true,
+      "properties": {
+        "backend": {
+          "type": "string",
+          "enum": ["qmd", "sqlite", "none"],
+          "description": "Memory backend to use. 'qmd' manages embeddings internally."
+        }
+      }
+    }
+  }
+}
